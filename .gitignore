@@ -3,3 +3,5 @@ __pycache__/
 *.mp3
 final_prompt.txt
 media/
+.env
+results/
