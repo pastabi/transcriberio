@@ -20,4 +20,4 @@ pip install -q -r requirements.txt
 
 # 4. Spin up the application UI server
 echo "🖥️  Launching browser dashboard..."
-python converter.py
+python main.py
