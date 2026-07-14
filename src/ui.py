@@ -2,41 +2,102 @@ import os
 
 import gradio as gr
 
+CSS = """
+.dimmed {
+    opacity: 0.3 !important;
+    pointer-events: none !important;
+    user-select: none !important;
+    transition: opacity 0.3s ease;
+}
+
+/* Force the outer wrapper to be small */
+.short_file {
+    max-height: 60px !important;
+}
+
+/* Target the specific inner Svelte divs from your screenshot to kill the default tall height */
+.short_file .large, 
+.short_file .empty, 
+.short_file [aria-label="Empty value"] {
+    max-height: 60px !important;
+    height: 60px !important;
+}
+.short_file .icon {
+    display: none;
+}
+
+.minimal-cb {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    
+    min-width: 16px !important; 
+    width: 16px !important;
+    
+    flex: 0 0 16px !important; 
+    padding: 0 !important;
+    margin-top: 2px !important;
+}
+
+.minimal-cb label {
+    padding: 0 !important;
+}
+
+.anti-blick {
+    overflow: hidden !important;
+}
+
+body.dark, .dark {
+    color-scheme: dark !important;
+}
+"""
+
 
 def create_ui(pipeline_callback):
-    with gr.Blocks(title="Transcriberio") as app:
+    initial_groq = os.getenv("GROQ_API_KEY", "")
+    initial_gemini = os.getenv("GEMINI_API_KEY", "")
+
+    def get_keys_label(groq, gemini):
+        g_stat = "key present" if groq and groq.strip() else "no key"
+        gem_stat = "key present" if gemini and gemini.strip() else "no key"
+        return f"(Groq - {g_stat}, Gemini - {gem_stat})"
+
+    with gr.Blocks(title="Transcriberio", css=CSS) as app:
         gr.Markdown("# AI Video Analyzer Pipeline")
 
         with gr.Row():
             with gr.Column():
 
-                gr.Markdown("### 1. API Keys (Will auto-fill after first run)")
-                groq_key_input = gr.Textbox(
-                    label="Groq API Key (For Audio)",
-                    type="password",
-                    value=os.getenv("GROQ_API_KEY", ""),
-                )
-                gemini_key_input = gr.Textbox(
-                    label="Gemini API Key (For Text Analysis)",
-                    type="password",
-                    value=os.getenv("GEMINI_API_KEY", ""),
-                )
+                # --- 1. API KEYS ---
+                is_open_by_default = not bool(initial_groq)
+
+                gr.Markdown("### 1. API Keys")
+                with gr.Accordion(
+                    label=get_keys_label(initial_groq, initial_gemini),
+                    open=is_open_by_default,
+                ) as keys_accordion:
+                    gr.Markdown("Keys will auto-fill after your first run.")
+                    groq_key_input = gr.Textbox(
+                        label="Groq API Key (For Audio)",
+                        type="password",
+                        value=initial_groq,
+                    )
+                    gemini_key_input = gr.Textbox(
+                        label="Gemini API Key (For Text Analysis)",
+                        type="password",
+                        value=initial_gemini,
+                    )
 
                 gr.Markdown("---")
 
+                # --- 2. VIDEO UPLOAD ---
                 gr.Markdown("### 2. Upload video")
                 with gr.Row(equal_height=False):
                     video_input = gr.Video(
                         label="Choose Video File", scale=2, min_width=200
                     )
                     language_input = gr.Dropdown(
-                        choices=[
-                            "Auto-Detect",
-                            "Ukrainian",
-                            "English",
-                            "Russian",
-                            "Polish",
-                        ],
+                        choices=["Auto-Detect", "Ukrainian", "Russian", "English"],
                         value="Auto-Detect",
                         label="Force Transcription Language",
                         scale=1,
@@ -45,30 +106,215 @@ def create_ui(pipeline_callback):
 
                 gr.Markdown("---")
 
-                gr.Markdown("### 3. AI Instructions Template")
-                template_file_input = gr.UploadButton(
-                    label="Attach .txt template file",
-                    file_types=[".txt"],
-                    variant="secondary",
-                )
-                fallback_text_input = gr.Textbox(
-                    label="Or write instructions directly here:",
-                    value="You are a helpful assistant. Please summarize the following video transcript in 3 bullet points:\n\n(Take into account this is automatic transcript, so some inconsistencies or meaning loses may occur because of wrong words interpretations)\n${TRANSCRIPT}",
-                    lines=6,
-                )
+                # --- 3. TEMPLATE TOGGLE & AUTO-FILL ---
+                with gr.Row(equal_height=True):
+                    use_template_cb = gr.Checkbox(
+                        show_label=False,
+                        value=True,
+                        container=False,
+                        elem_classes=["minimal-cb"],
+                    )
 
-                submit_btn = gr.Button("Run Full Pipeline", variant="primary")
-                status_tracker = gr.Markdown("### Status: Idle")
+                    template_title = gr.Markdown(
+                        "### 3. AI Instructions Template", elem_classes=["anti-blick"]
+                    )
+
+                with gr.Column() as template_content:
+                    template_file_input = gr.File(
+                        label="Upload a .txt template file",
+                        file_types=[".txt"],
+                        height=150,
+                    )
+                    fallback_text_input = gr.Textbox(
+                        label="Or write instructions directly here (auto-fills on file upload):",
+                        value="You are a helpful assistant. Please summarize the following video transcript:\n\n(Take into account that this is an automatic transcription, so some inconsistencies or loss of meaning may occur due to incorrect word interpretations.)\n${TRANSCRIPT}",
+                        lines=8,
+                        max_lines=8,
+                    )
+
+                gr.Markdown("---")
+
+                # --- 4. AI TOGGLE ---
+                with gr.Row(equal_height=True):
+                    use_ai_cb = gr.Checkbox(
+                        show_label=False,
+                        value=True,
+                        container=False,
+                        elem_classes=["minimal-cb"],
+                    )
+                    ai_title = gr.Markdown("### 4. Perform AI Analysis")
+
+                # --- BUTTONS ---
+                with gr.Row():
+                    # Disabled by default until a video is uploaded
+                    submit_btn = gr.Button(
+                        "Run Full Pipeline", variant="primary", interactive=False
+                    )
+                    cancel_btn = gr.Button(
+                        "Stop / Cancel", variant="stop", visible=False
+                    )
 
             with gr.Column():
-                gr.Markdown("### 4. Results")
-                prompt_output = gr.Textbox(
-                    label="Intermediate Step: The Prompt Sent to AI", lines=8
+                gr.Markdown("### Status")
+                status_tracker = gr.TextArea(
+                    show_label=False,
+                    value="Idle",
+                    lines=5,
+                    max_lines=5,
+                    container=False,
+                    elem_id="status-log-area",
                 )
-                ai_output = gr.Textbox(label="Final Result: AI Response", lines=12)
-                file_output = gr.File(label="Download AI Response (.txt)")
+                gr.Markdown("### 5. Results")
+                gr.Markdown("##### 5.1 Text outputs")
 
-        submit_btn.click(
+                prompt_output = gr.Textbox(
+                    label="The Prompt With Transcript", lines=8, max_lines=8
+                )
+                ai_output = gr.Textbox(
+                    label="Final Result: AI Response", lines=10, max_lines=10
+                )
+
+                gr.Markdown("##### 5.2 File outputs")
+
+                audio_file_output = gr.File(
+                    label="📥 Download audio (.mp3)",
+                    elem_classes=["short_file"],
+                )
+                transcription_file_output = gr.File(
+                    label="📥 Download transcript (.txt)",
+                    elem_classes=["short_file"],
+                )
+                ai_file_output = gr.File(
+                    label="📥 Download AI Response (.md)",
+                    elem_classes=["short_file"],
+                )
+
+        # ==========================================
+        # EVENT LISTENERS & LOGIC
+        # ==========================================
+
+        # 1. Update Accordion Title dynamically as user types their keys
+        def update_accordion_title(groq, gemini):
+            return gr.update(label=get_keys_label(groq, gemini))
+
+        groq_key_input.change(
+            update_accordion_title,
+            inputs=[groq_key_input, gemini_key_input],
+            outputs=keys_accordion,
+        )
+        gemini_key_input.change(
+            update_accordion_title,
+            inputs=[groq_key_input, gemini_key_input],
+            outputs=keys_accordion,
+        )
+
+        # 2. Smart Disable/Enable for the Run Button
+        def validate_inputs(video, groq, gemini, ai_enabled):
+            # Check 1: Must have a video
+            if not video:
+                return gr.update(interactive=False)
+            # Check 2: Must have Groq key (always needed for audio)
+            if not groq.strip():
+                return gr.update(interactive=False)
+            # Check 3: If AI is toggled ON, must have Gemini key
+            if ai_enabled and not gemini.strip():
+                return gr.update(interactive=False)
+
+            # If we pass all checks, enable the button!
+            return gr.update(interactive=True)
+
+        inputs_to_watch = [video_input, groq_key_input, gemini_key_input, use_ai_cb]
+
+        # Attach the validation to anytime these inputs change
+        for component in inputs_to_watch:
+            component.change(
+                validate_inputs, inputs=inputs_to_watch, outputs=submit_btn
+            )
+        # Videos also trigger .upload and .clear, so we bind those too
+        video_input.upload(validate_inputs, inputs=inputs_to_watch, outputs=submit_btn)
+        video_input.clear(validate_inputs, inputs=inputs_to_watch, outputs=submit_btn)
+
+        # 3. Auto-fill Textbox from .txt file upload
+        def read_file_content(file_obj):
+            if file_obj is None:
+                return gr.update()  # Do nothing if file is cleared
+            try:
+                with open(file_obj.name, "r", encoding="utf-8") as f:
+                    # Rerender the textbox with the text from the file
+                    return gr.update(value=f.read())
+            except Exception as e:
+                return gr.update(value=f"Error reading file: {str(e)}")
+
+        template_file_input.upload(
+            read_file_content, inputs=template_file_input, outputs=fallback_text_input
+        )
+
+        # 4. Disable turned off sections
+        def handle_template_toggle(is_enabled):
+            # Apply our CSS class if disabled
+            classes = ["anti-blick"] if is_enabled else ["dimmed", "anti-blick"]
+
+            # Switch the label string
+            prompt_label = "The Prompt With Transcript" if is_enabled else "Transcript"
+
+            # Cascade disable AI: If template turns off, force AI off. If template turns on, do nothing.
+            cascade_ai = gr.update(value=False) if not is_enabled else gr.update()
+
+            return (
+                gr.update(elem_classes=classes),  # Dims the title markdown
+                gr.update(elem_classes=classes),  # Dims the file/textbox content
+                gr.update(label=prompt_label),  # Updates the output label
+                cascade_ai,  # Triggers the AI checkbox
+            )
+
+        use_template_cb.change(
+            handle_template_toggle,
+            inputs=[use_template_cb],
+            outputs=[template_title, template_content, prompt_output, use_ai_cb],
+        )
+
+        def handle_ai_toggle(is_enabled):
+            classes = ["anti-blick"] if is_enabled else ["dimmed", "anti-blick"]
+
+            return (
+                gr.update(elem_classes=classes),  # Dims the AI title markdown
+                gr.update(visible=is_enabled),  # Completely hides the AI Textbox
+                gr.update(
+                    visible=is_enabled
+                ),  # Completely hides the AI Download button
+            )
+
+        use_ai_cb.change(
+            handle_ai_toggle,
+            inputs=[use_ai_cb],
+            outputs=[ai_title, ai_output, ai_file_output],
+        )
+
+        # 5. Scroll status area when overflow
+        # Create a raw JavaScript function as a string
+        scroll_js = """
+        function() {
+            const textarea = document.querySelector('#status-log-area textarea');
+            if (textarea) {
+                textarea.scrollTop = textarea.scrollHeight;
+            }
+        }
+        """
+        # Fire this JS every time the text in status_tracker updates
+        status_tracker.change(fn=None, inputs=None, outputs=None, js=scroll_js)
+
+        # 6. Pipeline Execution & Cancellation Logic
+        # Helper function to swap button visibility
+        def swap_buttons(show_submit):
+            return gr.update(visible=show_submit), gr.update(visible=not show_submit)
+
+        # Step A: When clicked, instantly hide Submit and show Cancel
+        start_run = submit_btn.click(
+            fn=lambda: swap_buttons(show_submit=False), outputs=[submit_btn, cancel_btn]
+        )
+
+        # Step B: Trigger the actual pipeline
+        run_event = start_run.then(
             fn=pipeline_callback,
             inputs=[
                 video_input,
@@ -77,8 +323,29 @@ def create_ui(pipeline_callback):
                 language_input,
                 groq_key_input,
                 gemini_key_input,
+                use_template_cb,
+                use_ai_cb,
             ],
-            outputs=[status_tracker, prompt_output, ai_output, file_output],
+            outputs=[
+                status_tracker,
+                prompt_output,
+                ai_output,
+                audio_file_output,
+                transcription_file_output,
+                ai_file_output,
+            ],
+        )
+
+        # Step C: If the pipeline finishes naturally, swap the buttons back
+        run_event.then(
+            fn=lambda: swap_buttons(show_submit=True), outputs=[submit_btn, cancel_btn]
+        )
+
+        # Step D: If Cancel is clicked, swap buttons back AND kill the run_event
+        cancel_btn.click(
+            fn=lambda: swap_buttons(show_submit=True),
+            outputs=[submit_btn, cancel_btn],
+            cancels=[run_event],
         )
 
     return app
