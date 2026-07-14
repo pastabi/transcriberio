@@ -1,2 +1,4 @@
-gradio
+gradio==6.20.0
 groq
+google-genai
+python-dotenv
