@@ -55,7 +55,7 @@ cd transcriberio
 
 ## Plans
 
-1. Add longer videos support (over 1:40 hours)
-2. Add automatic Gemini model switch (to newer available versions or if some is unavailable right now)
-3. Add video support via link (video will be downloaded with yt-dlp)
-4. Create sufficient documentation and instructions
+- [x] 1. Add longer videos support (over 1:40 hours)
+- [ ] 2. Add automatic Gemini model switch (to newer available versions or if some is unavailable right now)
+- [ ] 3. Add video support via link (video will be downloaded with yt-dlp)
+- [ ] 4. Create sufficient documentation and instructions

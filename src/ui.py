@@ -53,7 +53,7 @@ body.dark, .dark {
 """
 
 
-def create_ui(pipeline_callback):
+def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
     initial_groq = os.getenv("GROQ_API_KEY", "")
     initial_gemini = os.getenv("GEMINI_API_KEY", "")
 
@@ -97,7 +97,13 @@ def create_ui(pipeline_callback):
                         label="Choose Video File", scale=2, min_width=200
                     )
                     language_input = gr.Dropdown(
-                        choices=["Auto-Detect", "Ukrainian", "Russian", "English"],
+                        choices=[
+                            "Auto-Detect",
+                            "Ukrainian",
+                            "Russian",
+                            "English",
+                            "Polish",
+                        ],
                         value="Auto-Detect",
                         label="Force Transcription Language",
                         scale=1,
