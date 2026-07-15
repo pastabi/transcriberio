@@ -10,7 +10,7 @@ from src.fill_template import fill_template
 from src.to_audio import FFmpegError, extract_audio
 from src.transcribe import transcribe_audio
 from src.ui import create_ui
-from src.utils import append_timestamp
+from src.utils.utils import append_timestamp
 
 load_dotenv()
 
@@ -181,7 +181,7 @@ def run_pipeline(
         start = datetime.now()
         try:
             pipeline_active.set()
-            final_ai_text = analyze_text(
+            final_ai_text, models_used = analyze_text(
                 filled_template, gemini_key, ai_txt_output_path
             )
             pipeline_active.clear()
@@ -203,6 +203,22 @@ def run_pipeline(
 
         elapsed = datetime.now() - start
         seconds_taken = round(elapsed.total_seconds(), 1)
+
+        if len(models_used) == 2:
+            status_logs.append(
+                append_timestamp(
+                    f"ℹ️ Model {models_used[0]} was unavailable, used {models_used[1]} instead"
+                )
+            )
+        elif len(models_used) == 3:
+            status_logs.append(
+                append_timestamp(
+                    f"ℹ️ Models {models_used[0]}, {models_used[1]} were unavailable, used {models_used[2]} instead"
+                )
+            )
+        else:
+            status_logs.append(append_timestamp(f"ℹ️ Model {models_used[0]} was used"))
+
         status_logs.append(append_timestamp(f"✅ Done in {seconds_taken} seconds"))
         yield get_status(), filled_template, final_ai_text, mp3_output, txt_output_path, ai_txt_output_path
     else:

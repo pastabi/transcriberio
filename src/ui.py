@@ -3,7 +3,7 @@ import time
 
 import gradio as gr
 
-from src.utils import append_timestamp
+from src.utils.utils import append_timestamp
 
 CSS = """
 .dimmed {

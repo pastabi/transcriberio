@@ -38,6 +38,8 @@ winget install Gyan.FFmpeg
 1. Go to the folder you want this tool to live in
 2. Download files from Github
 
+Download the zip archive with all the files, or use the command line (git need to be installed)
+
 ```bash
 git clone https://github.com/pastabi/transcriberio.git
 ```
@@ -56,6 +58,6 @@ cd transcriberio
 ## Plans
 
 - [x] 1. Add longer videos support (over 1:40 hours)
-- [ ] 2. Add automatic Gemini model switch (to newer available versions or if some is unavailable right now)
+- [x] 2. Add fallback models for AI analysis, so it works even if primary one is unavailable in the moment
 - [x] 3. Add video support via link (video will be downloaded with yt-dlp)
 - [ ] 4. Create sufficient documentation and instructions
