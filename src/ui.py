@@ -3,6 +3,8 @@ import time
 
 import gradio as gr
 
+from src.utils import append_timestamp
+
 CSS = """
 .dimmed {
     opacity: 0.3 !important;
@@ -93,6 +95,14 @@ def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
 
                 # --- 2. VIDEO UPLOAD ---
                 gr.Markdown("### 2. Upload video")
+
+                video_url = gr.Textbox(
+                    label="Use Video From URL (audio from this link will be downloaded after you start the pipeline)",
+                    placeholder="If you attach video file below, URL here will be ignored",
+                    # lines=1,
+                    max_lines=1,
+                )
+
                 with gr.Row(equal_height=False):
                     video_input = gr.Video(
                         label="Choose Video File", scale=2, min_width=200
@@ -216,9 +226,9 @@ def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
         )
 
         # 2. Smart Disable/Enable for the Run Button
-        def validate_inputs(video, groq, gemini, ai_enabled):
+        def validate_inputs(video, url, groq, gemini, ai_enabled):
             # Check 1: Must have a video
-            if not video:
+            if not video and not url:
                 return gr.update(interactive=False)
             # Check 2: Must have Groq key (always needed for audio)
             if not groq.strip():
@@ -230,7 +240,13 @@ def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
             # If we pass all checks, enable the button!
             return gr.update(interactive=True)
 
-        inputs_to_watch = [video_input, groq_key_input, gemini_key_input, use_ai_cb]
+        inputs_to_watch = [
+            video_input,
+            video_url,
+            groq_key_input,
+            gemini_key_input,
+            use_ai_cb,
+        ]
 
         # Attach the validation to anytime these inputs change
         for component in inputs_to_watch:
@@ -325,6 +341,7 @@ def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
             fn=pipeline_callback,
             inputs=[
                 video_input,
+                video_url,
                 template_file_input,
                 fallback_text_input,
                 language_input,
@@ -357,12 +374,13 @@ def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
 
         def cancel_cleanup(status_tracker):
             # Updataing the status to indicate that cancellation has started
-            status_tracker += "\n⛔ Pipeline cancel initiated..."
+            status_tracker += f"\n{append_timestamp("⛔ Pipeline cancel initiated...")}"
             yield gr.update(value=status_tracker), gr.update()
 
             # If the pipeline is still grinding through a blocking process, wait for it
             if pipeline_active.is_set():
-                status_tracker += "\n⏳ Waiting for background processes to halt..."
+                status_tracker += f"\n{append_timestamp("⏳ Waiting for background processes to halt...")}"
+
                 yield gr.update(value=status_tracker), gr.update(interactive=False)
 
             # Block the cleanup until pipeline_active.clear() is called
@@ -371,7 +389,7 @@ def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
 
             # Now that the background processes are completely dead, execute the wipe
             cleanup_temp_dirs()
-            status_tracker += "\n⚠️ Pipeline stopped successfully. Cleanup finished."
+            status_tracker += f"\n{append_timestamp("ℹ️ Pipeline stopped successfully. Cleanup finished.")}"
             yield gr.update(value=status_tracker), gr.update(interactive=True)
 
         start_cancel.then(

@@ -10,6 +10,7 @@ from src.fill_template import fill_template
 from src.to_audio import FFmpegError, extract_audio
 from src.transcribe import transcribe_audio
 from src.ui import create_ui
+from src.utils import append_timestamp
 
 load_dotenv()
 
@@ -31,6 +32,7 @@ def cleanup_temp_dirs():
 
 def run_pipeline(
     video_path,
+    video_url,
     template_file,
     system_prompt_fallback,
     language_choice,
@@ -39,62 +41,64 @@ def run_pipeline(
     use_template_cb,
     use_ai_cb,
 ):
-    status_logs = ["Starting Pipeline..."]
-    number_of_steps = 4 if use_ai_cb else 3
-
     def get_status():
         return "\n".join(status_logs)
 
-    def append_timestamp(message):
-        return f"({datetime.now().strftime("%H:%M:%S")}) {message}"
+    status_logs = [append_timestamp("Starting Pipeline...")]
+
+    number_of_steps = 4 if use_ai_cb else 3
 
     if not groq_key.strip():
-        yield "❌ Error: Please enter Groq API Key.", "", "", None, None, None
+        yield "⚠️ Error: Please enter Groq API Key.", "", "", None, None, None
         return
     elif use_ai_cb and not gemini_key.strip():
-        yield "❌ Error: Please enter Gemini API Key to use AI analysis.", "", "", None, None, None
+        yield "⚠️ Error: Please enter Gemini API Key to use AI analysis.", "", "", None, None, None
         return
 
     with open(".env", "w") as env_file:
         env_file.write(f"GROQ_API_KEY={groq_key.strip()}\n")
         env_file.write(f"GEMINI_API_KEY={gemini_key.strip()}\n")
 
-    if not video_path:
-        yield "❌ Error: Please upload a video file.", "", "", None, None, None
+    if not video_path and not video_url:
+        yield "⚠️ Error: Please upload a video file or insert video url.", "", "", None, None, None
         return
 
     start = datetime.now()
     timestamp = start.strftime("%Y%m%d_%H%M%S")
     mp3_output = f"results/{timestamp}_audio.mp3"
     txt_output_path = f"results/{timestamp}_transcription_result.txt"
-    ai_txt_output_path = f"results/{timestamp}_ai_final_result.txt"
+    ai_txt_output_path = f"results/{timestamp}_ai_final_result.md"
 
     # --- STEP 1: Audio ---
     audio_status_text = append_timestamp(
         f"⏳ Step 1/{number_of_steps}: Extracting audio..."
+        if not video_url
+        else f"⏳ Step 1/{number_of_steps}: Downloading audio from provided URL..."
     )
     status_logs.append(audio_status_text)
     yield get_status(), "", "", None, None, None
 
     try:
         pipeline_active.set()
-        audio_chanks, temp_audio_chanks_dir = extract_audio(video_path, mp3_output)
+        audio_chanks, temp_audio_chanks_dir = extract_audio(
+            video_path, video_url, mp3_output
+        )
         temp_dirs.append(temp_audio_chanks_dir)
         pipeline_active.clear()
     except FFmpegError as e:
         pipeline_active.clear()
-        status_logs.append(append_timestamp(f"❌ FFmpeg Error: {str(e)}"))
+        status_logs.append(append_timestamp(f"⚠️ FFmpeg Error: {str(e)}"))
         yield get_status(), "", "", None, None, None
         return
     except Exception as e:
         pipeline_active.clear()
-        status_logs.append(append_timestamp(f"❌ Unknown Error: {str(e)}"))
+        status_logs.append(append_timestamp(f"⚠️ Unknown Error: {str(e)}"))
         yield get_status(), "", "", None, None, None
         return
 
     elapsed = datetime.now() - start
     seconds_taken = round(elapsed.total_seconds(), 1)
-    status_logs.append(append_timestamp(f"(✅ Done in {seconds_taken} seconds"))
+    status_logs.append(append_timestamp(f"✅ Done in {seconds_taken} seconds"))
     yield get_status(), "", "", mp3_output, None, None
 
     # --- STEP 2: Transcribe ---
@@ -113,17 +117,17 @@ def run_pipeline(
         pipeline_active.clear()
     except RuntimeError as e:
         pipeline_active.clear()
-        status_logs.append(append_timestamp(f"❌ Groq Transcribing Error: {str(e)}"))
+        status_logs.append(append_timestamp(f"⚠️ Groq Transcribing Error: {str(e)}"))
         yield get_status(), "", "", mp3_output, None, None
         return
     except IOError as e:
         pipeline_active.clear()
-        status_logs.append(append_timestamp(f"❌ File Save Error: {str(e)}"))
+        status_logs.append(append_timestamp(f"⚠️ File Save Error: {str(e)}"))
         yield get_status(), "", "", mp3_output, None, None
         return
     except Exception as e:
         pipeline_active.clear()
-        status_logs.append(append_timestamp(f"❌ Unknown Error: {str(e)}"))
+        status_logs.append(append_timestamp(f"⚠️ Unknown Error: {str(e)}"))
         yield get_status(), "", "", mp3_output, None, None
         return
     finally:
@@ -154,12 +158,12 @@ def run_pipeline(
         pipeline_active.clear()
     except IOError as e:
         pipeline_active.clear()
-        status_logs.append(append_timestamp(f"❌ File Read Error: {str(e)}"))
+        status_logs.append(append_timestamp(f"⚠️ File Read Error: {str(e)}"))
         yield get_status(), filled_template, "", mp3_output, txt_output_path, None
         return
     except Exception as e:
         pipeline_active.clear()
-        status_logs.append(append_timestamp(f"❌ Unknown Error: {str(e)}"))
+        status_logs.append(append_timestamp(f"⚠️ Unknown Error: {str(e)}"))
         yield get_status(), filled_template, "", mp3_output, txt_output_path, None
         return
 
@@ -183,17 +187,17 @@ def run_pipeline(
             pipeline_active.clear()
         except RuntimeError as e:
             pipeline_active.clear()
-            status_logs.append(append_timestamp(f"❌ AI Error: {str(e.message)}"))
+            status_logs.append(append_timestamp(f"⚠️ AI Error: {str(e)}"))
             yield get_status(), filled_template, "", mp3_output, txt_output_path, None
             return
         except IOError as e:
             pipeline_active.clear()
-            status_logs.append(append_timestamp(f"❌ File Save Error: {str(e)}"))
+            status_logs.append(append_timestamp(f"⚠️ File Save Error: {str(e)}"))
             yield get_status(), filled_template, "", mp3_output, txt_output_path, None
             return
         except Exception as e:
             pipeline_active.clear()
-            status_logs.append(append_timestamp(f"❌ Unknown Error: {str(e)}"))
+            status_logs.append(append_timestamp(f"⚠️ Unknown Error: {str(e)}"))
             yield get_status(), filled_template, "", mp3_output, txt_output_path, None
             return
 
