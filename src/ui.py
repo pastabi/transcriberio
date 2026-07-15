@@ -1,4 +1,5 @@
 import os
+import time
 
 import gradio as gr
 
@@ -348,10 +349,35 @@ def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
         )
 
         # Step D: If Cancel is clicked, swap buttons back AND kill the run_event
-        cancel_btn.click(
+        start_cancel = cancel_btn.click(
             fn=lambda: swap_buttons(show_submit=True),
             outputs=[submit_btn, cancel_btn],
             cancels=[run_event],
+        )
+
+        def cancel_cleanup(status_tracker):
+            # Updataing the status to indicate that cancellation has started
+            status_tracker += "\n⛔ Pipeline cancel initiated..."
+            yield gr.update(value=status_tracker), gr.update()
+
+            # If the pipeline is still grinding through a blocking process, wait for it
+            if pipeline_active.is_set():
+                status_tracker += "\n⏳ Waiting for background processes to halt..."
+                yield gr.update(value=status_tracker), gr.update(interactive=False)
+
+            # Block the cleanup until pipeline_active.clear() is called
+            while pipeline_active.is_set():
+                time.sleep(0.5)
+
+            # Now that the background processes are completely dead, execute the wipe
+            cleanup_temp_dirs()
+            status_tracker += "\n⚠️ Pipeline stopped successfully. Cleanup finished."
+            yield gr.update(value=status_tracker), gr.update(interactive=True)
+
+        start_cancel.then(
+            fn=cancel_cleanup,
+            inputs=status_tracker,
+            outputs=[status_tracker, submit_btn],
         )
 
     return app
