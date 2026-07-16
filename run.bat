@@ -1,17 +1,18 @@
 @echo off
 echo 🚀 Starting Transcriberio...
 
-:: 1. Automatically build virtual environment folder if it doesn't exist yet
-if not exist .venv (
-    echo 📦 Creating local Python virtual environment (.venv)...
-    python -m venv .venv
-    if errorlevel 1 (
-        echo ❌ Failed to create virtual environment. Ensure Python is installed.
-        pause
-        exit /b 1
-    )
+:: 1. Skip creation if virtual environment folder already exists
+if exist .venv goto :activate
+
+echo 📦 Creating local Python virtual environment...
+python -m venv .venv
+if errorlevel 1 (
+    echo ❌ Failed to create virtual environment. Ensure Python is installed.
+    pause
+    exit /b 1
 )
 
+:activate
 :: 2. Activate the virtual environment
 call .venv\Scripts\activate.bat
 if errorlevel 1 (

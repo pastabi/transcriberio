@@ -5,3 +5,8 @@ final_prompt.txt
 media/
 .env
 results/
+*.exe
+dist/
+build/
+*.zip
+*.spec
