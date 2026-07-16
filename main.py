@@ -72,7 +72,7 @@ def run_pipeline(
     # --- STEP 1: Audio ---
     audio_status_text = append_timestamp(
         f"⏳ Step 1/{number_of_steps}: Extracting audio..."
-        if not video_url
+        if video_path
         else f"⏳ Step 1/{number_of_steps}: Downloading audio from provided URL..."
     )
     status_logs.append(audio_status_text)
