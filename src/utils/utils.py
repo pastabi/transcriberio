@@ -16,3 +16,8 @@ def cleanup_temp_dirs(temp_dirs):
             except Exception:
                 pass
     temp_dirs.clear()
+
+
+def seconds_passed(start):
+    elapsed = datetime.now() - start
+    return round(elapsed.total_seconds(), 1)

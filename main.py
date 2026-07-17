@@ -8,7 +8,7 @@ from src.fill_template import fill_template
 from src.to_audio import FFmpegError, extract_audio
 from src.transcribe import transcribe_audio
 from src.ui import create_ui
-from src.utils.utils import append_timestamp, cleanup_temp_dirs
+from src.utils.utils import append_timestamp, cleanup_temp_dirs, seconds_passed
 
 load_dotenv()
 
@@ -86,8 +86,8 @@ def run_pipeline(
         yield get_status(), "", "", None, None, None
         return
 
-    elapsed = datetime.now() - start
-    seconds_taken = round(elapsed.total_seconds(), 1)
+    # calculating how many seconds the step taken and outputting the result
+    seconds_taken = seconds_passed(start)
     status_logs.append(append_timestamp(f"✅ Done in {seconds_taken} seconds"))
     yield get_status(), "", "", mp3_output, None, None
 
@@ -123,8 +123,7 @@ def run_pipeline(
     finally:
         cleanup_temp_dirs()
 
-    elapsed = datetime.now() - start
-    seconds_taken = round(elapsed.total_seconds(), 1)
+    seconds_taken = seconds_passed(start)
     status_logs.append(append_timestamp(f"✅ Done in {seconds_taken} seconds"))
     yield get_status(), "", "", mp3_output, txt_output_path, None
 
@@ -157,8 +156,7 @@ def run_pipeline(
         yield get_status(), filled_template, "", mp3_output, txt_output_path, None
         return
 
-    elapsed = datetime.now() - start
-    seconds_taken = round(elapsed.total_seconds(), 1)
+    seconds_taken = seconds_passed(start)
     status_logs.append(append_timestamp(f"✅ Done in {seconds_taken} seconds"))
     yield get_status(), filled_template, "", mp3_output, txt_output_path, None
 
@@ -191,8 +189,7 @@ def run_pipeline(
             yield get_status(), filled_template, "", mp3_output, txt_output_path, None
             return
 
-        elapsed = datetime.now() - start
-        seconds_taken = round(elapsed.total_seconds(), 1)
+        seconds_taken = seconds_passed(start)
 
         if len(models_used) == 2:
             status_logs.append(
