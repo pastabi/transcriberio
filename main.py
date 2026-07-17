@@ -121,7 +121,8 @@ def run_pipeline(
         yield get_status(), "", "", mp3_output, None, None
         return
     finally:
-        cleanup_temp_dirs()
+        # when we got the transcript we don't need chanks anymore
+        cleanup_temp_dirs(temp_dirs)
 
     seconds_taken = seconds_passed(start)
     status_logs.append(append_timestamp(f"✅ Done in {seconds_taken} seconds"))
