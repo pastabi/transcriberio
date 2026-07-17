@@ -1,5 +1,6 @@
 def fill_template(transcript, template_file, system_prompt_fallback):
     template_content = ""
+    # reading the template file, if such is provided
     if template_file is not None:
         try:
             with open(template_file.name, "r", encoding="utf-8") as f:
@@ -10,6 +11,7 @@ def fill_template(transcript, template_file, system_prompt_fallback):
         template_content = system_prompt_fallback
 
     placeholder = "${TRANSCRIPT}"
+    # just replacing the placeholder with the transcript, or adding the transcript at the end, that's it
     if placeholder in template_content:
         formatted_final_prompt = template_content.replace(
             placeholder, transcript.strip()

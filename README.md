@@ -119,5 +119,5 @@ To run the app next time, just run the .\run.bat in the command line, or doublec
 - [x] 1. Add longer videos support (over 1:40 hours)
 - [x] 2. Add fallback models for AI analysis, so it works even if primary one is unavailable in the moment
 - [x] 3. Add video support via link (video will be downloaded with yt-dlp)
-- [ ] 4. Create sufficient documentation and instructions
+- [x] 4. Create sufficient documentation and instructions
 - [x] 5. Add option to choose the model for the users with a paid plan

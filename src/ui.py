@@ -3,23 +3,25 @@ import time
 
 import gradio as gr
 
-from src.utils.utils import append_timestamp
-from src.utils.utils import cleanup_temp_dirs
+from src.utils.utils import append_timestamp, cleanup_temp_dirs
 
 CSS = """
+/* ---------- */
+/* class to dim the unchecked steps */
 .dimmed {
     opacity: 0.3 !important;
     pointer-events: none !important;
     user-select: none !important;
     transition: opacity 0.3s ease;
 }
+/* ---------- */
 
-/* Force the outer wrapper to be small */
+/* ---------- */
+/* Making the final files placehorders (before the files are there) small */
 .short_file {
     max-height: 60px !important;
 }
 
-/* Target the specific inner Svelte divs from your screenshot to kill the default tall height */
 .short_file .large, 
 .short_file .empty, 
 .short_file [aria-label="Empty value"] {
@@ -29,7 +31,10 @@ CSS = """
 .short_file .icon {
     display: none;
 }
+/* ---------- */
 
+/* ---------- */
+/* making the checkboxes just inline checkboxes, without texts, backgrounds, stretching etc */
 .minimal-cb {
     background: transparent !important;
     border: none !important;
@@ -46,39 +51,54 @@ CSS = """
 .minimal-cb label {
     padding: 0 !important;
 }
+/* ---------- */
 
+/* ---------- */
+/* fixing the bug with inputs flickering with controls when dimmed/undimmed */
 .anti-blick {
     overflow: hidden !important;
 }
+/* ---------- */
 
+/* ---------- */
+/* making the controls color correspond to the theme*/
 body.dark, .dark {
     color-scheme: dark !important;
 }
+/* ---------- */
 """
 
 
+# function that returns our ui (that we use to start browser in main.py)
 def create_ui(pipeline_callback, temp_dirs, pipeline_active):
+    # getting from .env our stored keys and model name from previous run (if present)
     initial_groq = os.getenv("GROQ_API_KEY", "")
     initial_gemini = os.getenv("GEMINI_API_KEY", "")
     initial_model = os.getenv("GEMINI_MODEL", "")
 
+    # function to create the label for keys area based on field inputs
     def get_keys_label(groq, gemini, model_name):
         g_stat = "key present" if groq and groq.strip() else "no key"
         gem_stat = "key present" if gemini and gemini.strip() else "no key"
         model = f", model - {model_name}" if model_name else ""
         return f"(Groq - {g_stat}, Gemini - {gem_stat}{model})"
 
+    # the function that uses gradio to create our ui
     with gr.Blocks(title="Transcriberio", css=CSS) as app:
         gr.Markdown("# AI Video Analyzer Pipeline")
 
         with gr.Row():
             with gr.Column():
 
+                # --- SECTIONS ---
                 # --- 1. API KEYS ---
+                # if we have groq key for audio transcription, we keep this section closed to not take space
                 is_open_by_default = not bool(initial_groq)
 
                 gr.Markdown("### 1. API Keys")
+                # creating accordion, to save the space - if we have our keys, we don't need to look at them
                 with gr.Accordion(
+                    # dynamically creating label, based on the loaded info
                     label=get_keys_label(initial_groq, initial_gemini, initial_model),
                     open=is_open_by_default,
                 ) as keys_accordion:
@@ -107,10 +127,10 @@ def create_ui(pipeline_callback, temp_dirs, pipeline_active):
                 video_url = gr.Textbox(
                     label="Use Video From URL (audio from this link will be downloaded after you start the pipeline)",
                     placeholder="If you attach video file below, URL here will be ignored",
-                    # lines=1,
                     max_lines=1,
                 )
 
+                # having the language chooser in the same line as the video, so the video element doesn't take as much space
                 with gr.Row(equal_height=False):
                     video_input = gr.Video(
                         label="Choose Video File", scale=2, min_width=200
@@ -167,14 +187,17 @@ def create_ui(pipeline_callback, temp_dirs, pipeline_active):
                         container=False,
                         elem_classes=["minimal-cb"],
                     )
-                    ai_title = gr.Markdown("### 4. Perform AI Analysis")
+                    ai_title = gr.Markdown(
+                        "### 4. Perform AI Analysis", elem_classes=["anti-blick"]
+                    )
 
                 # --- BUTTONS ---
                 with gr.Row():
-                    # Disabled by default until a video is uploaded
+                    # disabled by default until a video is uploaded (and keys are present)
                     submit_btn = gr.Button(
                         "Run Full Pipeline", variant="primary", interactive=False
                     )
+                    # will be swapped with Run when Run will be clicked, by default is not visible
                     cancel_btn = gr.Button(
                         "Stop / Cancel", variant="stop", visible=False
                     )
@@ -219,9 +242,13 @@ def create_ui(pipeline_callback, temp_dirs, pipeline_active):
         # ==========================================
 
         # 1. Update Accordion Title dynamically as user types their keys
+        # the function that makes some ui updates
+        # the inputs are determined by the "inputs" argument of the listener
         def update_accordion_title(groq, gemini, model_name):
+            # in which element exactly this specific UI update will happen the "outputs" argument of the listener determines
             return gr.update(label=get_keys_label(groq, gemini, model_name))
 
+        # the event listener itself
         groq_key_input.change(
             update_accordion_title,
             inputs=[groq_key_input, gemini_key_input, model_input],
@@ -239,6 +266,7 @@ def create_ui(pipeline_callback, temp_dirs, pipeline_active):
         )
 
         # 2. Smart Disable/Enable for the Run Button
+        # based on required states determines if Run button should be clickable
         def validate_inputs(video, url, groq, gemini, ai_enabled):
             # Check 1: Must have a video
             if not video and not url:
@@ -250,7 +278,7 @@ def create_ui(pipeline_callback, temp_dirs, pipeline_active):
             if ai_enabled and not gemini.strip():
                 return gr.update(interactive=False)
 
-            # If we pass all checks, enable the button!
+            # If we pass all checks, enable the button
             return gr.update(interactive=True)
 
         inputs_to_watch = [
@@ -285,9 +313,9 @@ def create_ui(pipeline_callback, temp_dirs, pipeline_active):
             read_file_content, inputs=template_file_input, outputs=fallback_text_input
         )
 
-        # 4. Disable turned off sections
+        # 4. Dimmen and disable the turned off sections
         def handle_template_toggle(is_enabled):
-            # Apply our CSS class if disabled
+            # Apply our CSS dimmen class if disabled, but don't forget about "anti-blick"
             classes = ["anti-blick"] if is_enabled else ["dimmed", "anti-blick"]
 
             # Switch the label string
@@ -296,6 +324,7 @@ def create_ui(pipeline_callback, temp_dirs, pipeline_active):
             # Cascade disable AI: If template turns off, force AI off. If template turns on, do nothing.
             cascade_ai = gr.update(value=False) if not is_enabled else gr.update()
 
+            # number of outputs should be the same as number of elements in "outputs" argument of listener
             return (
                 gr.update(elem_classes=classes),  # Dims the title markdown
                 gr.update(elem_classes=classes),  # Dims the file/textbox content
@@ -317,7 +346,7 @@ def create_ui(pipeline_callback, temp_dirs, pipeline_active):
                 gr.update(visible=is_enabled),  # Completely hides the AI Textbox
                 gr.update(
                     visible=is_enabled
-                ),  # Completely hides the AI Download button
+                ),  # Completely hides the AI file download area
             )
 
         use_ai_cb.change(
@@ -327,7 +356,7 @@ def create_ui(pipeline_callback, temp_dirs, pipeline_active):
         )
 
         # 5. Scroll status area when overflow
-        # Create a raw JavaScript function as a string
+        # Create a raw JavaScript function as a string to insert it into the element to run in dom
         scroll_js = """
         function() {
             const textarea = document.querySelector('#status-log-area textarea');
@@ -350,6 +379,7 @@ def create_ui(pipeline_callback, temp_dirs, pipeline_active):
         )
 
         # Step B: Trigger the actual pipeline
+        # "outputs" will receive data from all these yields we had in our pipeline
         run_event = start_run.then(
             fn=pipeline_callback,
             inputs=[
@@ -379,13 +409,14 @@ def create_ui(pipeline_callback, temp_dirs, pipeline_active):
             fn=lambda: swap_buttons(show_submit=True), outputs=[submit_btn, cancel_btn]
         )
 
-        # Step D: If Cancel is clicked, swap buttons back AND kill the run_event
+        # Step D: If Cancel is clicked, swap buttons back AND initiate the pipeline stop (kill the run_event)
         start_cancel = cancel_btn.click(
             fn=lambda: swap_buttons(show_submit=True),
             outputs=[submit_btn, cancel_btn],
             cancels=[run_event],
         )
 
+        # Step E: Wait untill all running processes end and run a cleanup function
         def cancel_cleanup(status_tracker):
             # Updataing the status to indicate that cancellation has started
             status_tracker += f"\n{append_timestamp("⛔ Pipeline cancel initiated...")}"
