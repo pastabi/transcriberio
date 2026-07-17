@@ -4,6 +4,7 @@ import time
 import gradio as gr
 
 from src.utils.utils import append_timestamp
+from src.utils.utils import cleanup_temp_dirs
 
 CSS = """
 .dimmed {
@@ -56,7 +57,7 @@ body.dark, .dark {
 """
 
 
-def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
+def create_ui(pipeline_callback, temp_dirs, pipeline_active):
     initial_groq = os.getenv("GROQ_API_KEY", "")
     initial_gemini = os.getenv("GEMINI_API_KEY", "")
     initial_model = os.getenv("GEMINI_MODEL", "")
@@ -401,7 +402,7 @@ def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
                 time.sleep(0.5)
 
             # Now that the background processes are completely dead, execute the wipe
-            cleanup_temp_dirs()
+            cleanup_temp_dirs(temp_dirs)
             status_tracker += f"\n{append_timestamp("ℹ️ Pipeline stopped successfully. Cleanup finished.")}"
             yield gr.update(value=status_tracker), gr.update(interactive=True)
 

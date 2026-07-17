@@ -1,5 +1,3 @@
-import os
-import shutil
 import threading
 from datetime import datetime
 
@@ -10,7 +8,7 @@ from src.fill_template import fill_template
 from src.to_audio import FFmpegError, extract_audio
 from src.transcribe import transcribe_audio
 from src.ui import create_ui
-from src.utils.utils import append_timestamp
+from src.utils.utils import append_timestamp, cleanup_temp_dirs
 
 load_dotenv()
 
@@ -18,16 +16,6 @@ temp_dirs = []
 
 
 pipeline_active = threading.Event()
-
-
-def cleanup_temp_dirs():
-    for temp_dir in temp_dirs:
-        if os.path.exists(temp_dir):
-            try:
-                shutil.rmtree(temp_dir)
-            except Exception:
-                pass
-    temp_dirs.clear()
 
 
 def run_pipeline(
@@ -235,5 +223,5 @@ def run_pipeline(
 # Launch the app
 if __name__ == "__main__":
     # Pass the run_pipeline function into our UI builder
-    demo = create_ui(run_pipeline, cleanup_temp_dirs, pipeline_active)
+    demo = create_ui(run_pipeline, temp_dirs, pipeline_active)
     demo.launch(inbrowser=True)
