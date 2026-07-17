@@ -2,6 +2,8 @@
 
 A simple browser-based local automation utility to extract audio from video clips, transcribe it with blazing speed using Groq's cloud-hosted Whisper-large-v3, wrap it smoothly inside structural templates and run the output throught Gemini AI to get some tolerable analysis.
 
+![App Screenshot](./assets/transcriberio_preview.png)
+
 ## Usage
 
 ### Features
