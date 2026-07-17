@@ -38,6 +38,7 @@ def run_pipeline(
     language_choice,
     groq_key,
     gemini_key,
+    model_name,
     use_template_cb,
     use_ai_cb,
 ):
@@ -58,6 +59,7 @@ def run_pipeline(
     with open(".env", "w") as env_file:
         env_file.write(f"GROQ_API_KEY={groq_key.strip()}\n")
         env_file.write(f"GEMINI_API_KEY={gemini_key.strip()}\n")
+        env_file.write(f"GEMINI_MODEL={model_name.strip()}\n")
 
     if not video_path and not video_url:
         yield "⚠️ Error: Please upload a video file or insert video url.", "", "", None, None, None
@@ -182,7 +184,7 @@ def run_pipeline(
         try:
             pipeline_active.set()
             final_ai_text, models_used = analyze_text(
-                filled_template, gemini_key, ai_txt_output_path
+                filled_template, gemini_key, model_name, ai_txt_output_path
             )
             pipeline_active.clear()
         except RuntimeError as e:

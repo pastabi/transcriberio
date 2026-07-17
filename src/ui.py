@@ -59,11 +59,13 @@ body.dark, .dark {
 def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
     initial_groq = os.getenv("GROQ_API_KEY", "")
     initial_gemini = os.getenv("GEMINI_API_KEY", "")
+    initial_model = os.getenv("GEMINI_MODEL", "")
 
-    def get_keys_label(groq, gemini):
+    def get_keys_label(groq, gemini, model_name):
         g_stat = "key present" if groq and groq.strip() else "no key"
         gem_stat = "key present" if gemini and gemini.strip() else "no key"
-        return f"(Groq - {g_stat}, Gemini - {gem_stat})"
+        model = f", model - {model_name}" if model_name else ""
+        return f"(Groq - {g_stat}, Gemini - {gem_stat}{model})"
 
     with gr.Blocks(title="Transcriberio", css=CSS) as app:
         gr.Markdown("# AI Video Analyzer Pipeline")
@@ -76,7 +78,7 @@ def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
 
                 gr.Markdown("### 1. API Keys")
                 with gr.Accordion(
-                    label=get_keys_label(initial_groq, initial_gemini),
+                    label=get_keys_label(initial_groq, initial_gemini, initial_model),
                     open=is_open_by_default,
                 ) as keys_accordion:
                     gr.Markdown("Keys will auto-fill after your first run.")
@@ -89,6 +91,11 @@ def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
                         label="Gemini API Key (For Text Analysis)",
                         type="password",
                         value=initial_gemini,
+                    )
+                    model_input = gr.Textbox(
+                        label="Model name (only if you have the paid plan, and want to use some other model)",
+                        placeholder="you would need to enter the exact model name, e.g. gemini-3.5-flash",
+                        value=initial_model,
                     )
 
                 gr.Markdown("---")
@@ -211,17 +218,22 @@ def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
         # ==========================================
 
         # 1. Update Accordion Title dynamically as user types their keys
-        def update_accordion_title(groq, gemini):
-            return gr.update(label=get_keys_label(groq, gemini))
+        def update_accordion_title(groq, gemini, model_name):
+            return gr.update(label=get_keys_label(groq, gemini, model_name))
 
         groq_key_input.change(
             update_accordion_title,
-            inputs=[groq_key_input, gemini_key_input],
+            inputs=[groq_key_input, gemini_key_input, model_input],
             outputs=keys_accordion,
         )
         gemini_key_input.change(
             update_accordion_title,
-            inputs=[groq_key_input, gemini_key_input],
+            inputs=[groq_key_input, gemini_key_input, model_input],
+            outputs=keys_accordion,
+        )
+        model_input.change(
+            update_accordion_title,
+            inputs=[groq_key_input, gemini_key_input, model_input],
             outputs=keys_accordion,
         )
 
@@ -347,6 +359,7 @@ def create_ui(pipeline_callback, cleanup_temp_dirs, pipeline_active):
                 language_input,
                 groq_key_input,
                 gemini_key_input,
+                model_input,
                 use_template_cb,
                 use_ai_cb,
             ],

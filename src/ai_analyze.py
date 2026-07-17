@@ -3,14 +3,18 @@ from pathlib import Path
 from google import genai
 
 
-def analyze_text(formatted_final_prompt, gemini_key, ai_txt_output_path):
+def analyze_text(formatted_final_prompt, gemini_key, model_name, ai_txt_output_path):
     gemini_client = genai.Client(api_key=gemini_key.strip())
 
-    model_waterfall = [
-        "gemini-3.5-flash",  # The primary fast model
-        "gemini-3-flash-preview",  # The stable free-tier workhorse
-        "gemini-3.1-flash-lite",  # The ultra-lightweight backup
-    ]
+    model_waterfall = (
+        [model_name]
+        if model_name
+        else [
+            "gemini-3.5-flash",  # The primary fast model
+            "gemini-3-flash-preview",  # The stable free-tier workhorse
+            "gemini-3.1-flash-lite",  # The ultra-lightweight backup
+        ]
+    )
 
     final_ai_text = None
     last_error = None
@@ -46,7 +50,9 @@ def analyze_text(formatted_final_prompt, gemini_key, ai_txt_output_path):
                 )
 
     # 3. If the loop finishes and we still don't have text, it means every model failed
-    if final_ai_text is None:
+    if model_name and final_ai_text is None:
+        raise RuntimeError(f"Provided model failed. Error: {last_error}")
+    elif final_ai_text is None:
         raise RuntimeError(
             f"All fallback models failed due to high demand or rate limits. Last error: {last_error}"
         )
