@@ -1,5 +1,6 @@
 import os
 import socket
+import sys
 import threading
 import time
 import urllib.error
@@ -18,6 +19,13 @@ from src.to_audio import FFmpegError, extract_audio
 from src.transcribe import transcribe_audio
 from src.ui import create_ui
 from src.utils.utils import append_timestamp, cleanup_temp_dirs, seconds_passed
+
+# If standard output is stripped by the OS, redirect it to a null device (black hole)
+# to prevent 'isatty' AttributeErrors across all libraries.
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")
 
 load_dotenv()
 
@@ -342,4 +350,4 @@ if __name__ == "__main__":
     threading.Thread(target=wait_and_open_browser, daemon=True).start()
 
     # 5. Start the server
-    uvicorn.run(app, host="127.0.0.1", port=APP_PORT, log_level="warning")
+    uvicorn.run(app, host="127.0.0.1", port=APP_PORT, log_config=None)
