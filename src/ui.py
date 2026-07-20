@@ -68,6 +68,23 @@ body.dark, .dark {
 /* ---------- */
 """
 
+# 1. Programmatically inject the CSS into the document head
+# 2. Start the heartbeat polling for the background server
+# (The browser will ping the server every 5 seconds, but browsers throttle background tabs, so this might drop to 1 ping/minute if the user switches tabs. We account for this in the main.py logic, allowing 120 seconds buffer time)
+# We use standard string formatting (%s) because f-strings will crash when they see CSS curly brackets
+custom_js = """
+function() {
+    var css = `%s`;
+    var style = document.createElement('style');
+    style.appendChild(document.createTextNode(css));
+    document.head.appendChild(style);
+
+    setInterval(function() {
+        fetch('/heartbeat').catch(() => {});
+    }, 5000);
+}
+""" % CSS.replace("`", "\\`")  # This escapes any possibe stray backticks in my CSS
+
 
 # function that returns our ui (that we use to start browser in main.py)
 def create_ui(pipeline_callback, temp_dirs, pipeline_active):
@@ -84,7 +101,11 @@ def create_ui(pipeline_callback, temp_dirs, pipeline_active):
         return f"(Groq - {g_stat}, Gemini - {gem_stat}{model})"
 
     # the function that uses gradio to create our ui
-    with gr.Blocks(title="Transcriberio", css=CSS) as app:
+    with gr.Blocks(title="Transcriberio") as app:
+
+        # triggers our css and js ping code attachment to the html after the block renders
+        app.load(js=custom_js)
+
         gr.Markdown("# AI Video Analyzer Pipeline")
 
         with gr.Row():

@@ -1,7 +1,16 @@
+import os
+import socket
 import threading
+import time
+import urllib.error
+import urllib.request
+import webbrowser
 from datetime import datetime
 
+import gradio as gr
+import uvicorn
 from dotenv import load_dotenv
+from fastapi import FastAPI
 
 from src.ai_analyze import analyze_text
 from src.fill_template import fill_template
@@ -255,9 +264,82 @@ def run_pipeline(
     yield get_status(), filled_template, final_ai_text, mp3_output, txt_output_path, ai_txt_output_path
 
 
+# --- HEARTBEAT & SERVER LOGIC ---
+
+# Global variable to track the last time the browser said "I'm still here"
+LAST_HEARTBEAT = time.time()
+TIMEOUT_SECONDS = 120
+
+# Initialize our own FastAPI app
+app = FastAPI()
+
+
+# Tries the default port, if in use, asks the OS for a random free one
+def get_free_port(default_port=7860):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(("127.0.0.1", default_port))
+            return default_port
+        except OSError:
+            # Port 7860 is taken. Passing 0 tells the OS to assign a random open port
+            s.bind(("127.0.0.1", 0))
+            return s.getsockname()[1]
+
+
+# Set the port globally so our browser function knows where to go
+APP_PORT = get_free_port()
+
+
+# Create the route for browser to ping
+# The browser pings this route every 5 seconds.
+@app.get("/heartbeat")
+def heartbeat():
+    global LAST_HEARTBEAT
+    LAST_HEARTBEAT = time.time()
+    return {"status": "alive"}
+
+
+# Runs in the background and kills the app if the browser disappears.
+def monitor_heartbeat():
+    # Give the app a 60-second grace period to boot up and open the browser initially
+    time.sleep(60)
+    while True:
+        time.sleep(5)
+        # If no ping has been received in the last 15 seconds, kill the OS process
+        if time.time() - LAST_HEARTBEAT > TIMEOUT_SECONDS:
+            print("Browser tab closed. Shutting down background server...")
+            os._exit(0)
+
+
+# Polls the server until it wakes up, then opens the browser.
+def wait_and_open_browser():
+    while True:
+        try:
+            # Try to ping the server
+            urllib.request.urlopen(f"http://127.0.0.1:{APP_PORT}/heartbeat")
+            break  # If successful, break out of the loop
+        except urllib.error.URLError:
+            # If the server isn't ready, the connection fails
+            # Wait 0.5 seconds and try again
+            time.sleep(0.5)
+
+    # Once the loop breaks, we know 100% the server is ready
+    webbrowser.open(f"http://127.0.0.1:{APP_PORT}")
+
+
 # Launch the app
-# ensures web server starts only when this file is run directly
 if __name__ == "__main__":
-    # creating out ui, passing the pipeline function to it and starting the app in browser
+    # 1. Start the background heartbeat monitor
+    threading.Thread(target=monitor_heartbeat, daemon=True).start()
+
+    # 2. Create the Gradio UI
     demo = create_ui(run_pipeline, temp_dirs, pipeline_active)
-    demo.launch(inbrowser=True)
+
+    # 3. Mount the Gradio app onto our FastAPI app so they share the same port
+    app = gr.mount_gradio_app(app, demo, path="/")
+
+    # 4. Start the dynamic polling thread, when the server is available, open the browser
+    threading.Thread(target=wait_and_open_browser, daemon=True).start()
+
+    # 5. Start the server
+    uvicorn.run(app, host="127.0.0.1", port=APP_PORT, log_level="warning")

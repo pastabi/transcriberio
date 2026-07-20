@@ -29,7 +29,7 @@ jobs:
 
       - name: Build with PyInstaller (Windows)
         run: >
-          pyinstaller --name "Transcriberio" --onedir --noconfirm 
+          pyinstaller --name "Transcriberio" --onedir --noconfirm --noconsole
           --collect-all gradio --collect-all yt_dlp --collect-all safehttpx --collect-all groovy
           --add-binary "ffmpeg.exe;." 
           main.py
@@ -67,7 +67,7 @@ jobs:
 
       - name: Build with PyInstaller (Linux)
         run: >
-          pyinstaller --name "Transcriberio" --onedir --noconfirm 
+          pyinstaller --name "Transcriberio" --onedir --noconfirm --noconsole
           --collect-all gradio --collect-all yt_dlp --collect-all safehttpx --collect-all groovy
           --add-binary "ffmpeg:." 
           main.py
