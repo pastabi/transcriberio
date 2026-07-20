@@ -48,6 +48,7 @@ def extract_audio(video_path, video_url, full_mp3_output):
             ydl_opts = {
                 "format": "bestaudio/best",
                 "outtmpl": f"{full_mp3_output}_temp.%(ext)s",
+                "noplaylist": True,
                 "quiet": True,
                 "no_warnings": True,
                 "ffmpeg_location": get_ffmpeg_path(),
