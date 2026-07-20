@@ -1,6 +1,7 @@
 import glob
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import yt_dlp
@@ -9,6 +10,28 @@ import yt_dlp
 # create custom error class for clearness and easier handling later
 class FFmpegError(Exception):
     pass
+
+
+# Dynamically finds ffmpeg whether running as a script or a compiled app on Windows or Linux
+def get_ffmpeg_path():
+    # Automatically detect OS: 'nt' is Windows, 'posix' is Linux/Mac
+    exe_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+
+    # Checks for the attribute "frozen" which indicates that app is running through a bundle, if present; otherwise returns False
+    if getattr(sys, "frozen", False):
+        # 1. Try PyInstaller's internal folder (_MEIPASS) where libraries etc are stored in a bundle
+        if hasattr(sys, "_MEIPASS"):
+            meipass_path = os.path.join(sys._MEIPASS, exe_name)
+            if os.path.exists(meipass_path):
+                return meipass_path
+
+        # 2. Try the same directory as the executable (fallback)
+        exe_path = os.path.join(os.path.dirname(sys.executable), exe_name)
+        if os.path.exists(exe_path):
+            return exe_path
+
+    # Fallback to system PATH if running normally from source
+    return exe_name
 
 
 def extract_audio(video_path, video_url, full_mp3_output):
@@ -27,6 +50,7 @@ def extract_audio(video_path, video_url, full_mp3_output):
                 "outtmpl": f"{full_mp3_output}_temp.%(ext)s",
                 "quiet": True,
                 "no_warnings": True,
+                "ffmpeg_location": get_ffmpeg_path(),
             }
             try:
                 # Initialize the yt-dlp downloader context manager using your custom configuration options
@@ -47,11 +71,14 @@ def extract_audio(video_path, video_url, full_mp3_output):
             # this is why we have temp_download_file, because source_file can be a user's file path, we don't want to touch it, but at the same time we would need to delete audio downloaded from url
             source_file = video_path
 
+        # get the ffmpeg path depending on how app is running (directly as .py or in a bundle as executable)
+        ffmpeg_exe = get_ffmpeg_path()
+
         # 2. Run our standard FFmpeg command on whatever source file we have
         # using array of options over string for safety (to avoid command injection via string variable)
         # we compressing audio here to the minimum possible state for clear voice recognition, because the model will anyway do this, but this way we save of the file size we send to API, so we can send much much longer audios in one go (because limit is 25MB per request)
         mp3_command = [
-            "ffmpeg",
+            ffmpeg_exe,
             "-i",
             source_file,
             "-vn",
@@ -88,7 +115,7 @@ def extract_audio(video_path, video_url, full_mp3_output):
         # %03d pattern will name chanks chunk_000.mp3, chunk_001.mp3, etc.
         chunk_pattern = str(temp_dir / "chunk_%03d.mp3")
         segment_command = [
-            "ffmpeg",
+            ffmpeg_exe,
             "-i",
             full_mp3_output,
             "-f",
